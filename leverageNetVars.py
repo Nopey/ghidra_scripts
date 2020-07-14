@@ -1,17 +1,12 @@
 # Fill struct fields that are netvars
+# DO NOT USE. THIS DOES NOT APPEAR TO CALCULATE THE OFFSETS CORRECTLY.
 #@author Magnus "Nopey" Larsen
 #@category 
 #@keybinding 
 #@menupath Tools.Misc.Leverage Netvars
 #@toolbar 
-# SAD POINT: DOESN'T HANDLE ARRAYS ELEGANTLY
-#TODO: What does InsideArray flag mean?
 
-import re#gex
-from ghidra.util.task import ConsoleTaskMonitor
-from ghidra.app.decompiler import DecompileOptions, DecompInterface
-from ghidra.program.model.data import PointerDataType, Pointer
-from ghidra.program.database.data import StructureDB
+from ghidra.program.model.data import PointerDataType
 program = getCurrentProgram()
 dataManager = program.getDataTypeManager()
 fm = program.getFunctionManager()
@@ -75,7 +70,10 @@ for line in lines:
                 field_data_type = dataManager.getDataType(program_name + "/Demangler/Vector")
                 field_size = 12
             elif field_type=="integer":
-                if bits <= 8:
+                # TODO: Are all integers 32 bits?? I wonder..
+                field_data_type = dataManager.getDataType("/uint" if unsigned else "/int")
+                field_size = 4
+                '''if bits <= 8:
                     # C chars are signed. bytes are unsigned.
                     field_data_type = dataManager.getDataType("/byte" if unsigned else "/char")
                     field_size = 1
@@ -87,6 +85,7 @@ for line in lines:
                     field_size = 4
                 else:
                     print("ERROR! integer has too many bits! ({})".format(bits))
+                '''
             elif field_type=="float":
                 # TODO: Might some floats not be 32bit?
                 field_data_type = dataManager.getDataType("/float")
@@ -111,17 +110,22 @@ for line in lines:
                 field_offset += offset
             field_name = field_name + end_name
 
+            # First, insert the network field into the struct
             class_struct.insertAtOffset(field_offset, field_data_type, field_size, field_name, "")
+            # this shifts all following fields over by field_size, so we need to
+            #   burn the spot immediately following our field
             burn = field_size
             burnAt = field_offset + field_size
             while field_size>0:
+                # We grab the next component 
                 at = class_struct.getComponentAt(burnAt)
                 if at is None:
+                    # we've burnt to the end of the class, we're done.
                     break
                 at_len = at.getLength()
                 class_struct.deleteAtOffset(burnAt)
                 burn   -= at_len
-                burnAt -= at_len
+            # I've never seen this bottom case happen, but it could happen.
             while field_size<0:
                 print("WARN: Partially overwrote preexisting field on {}".format(class_name))
                 class_struct.insertAtOffset(burnAt, dataManager.getDataType("/undefined1"), 1, "", "")
@@ -132,5 +136,6 @@ for line in lines:
         pass
     else:
         print("I don't understand this line: \'{}\'".format(expression))
+        break
 
     monitor.incrementProgress(1)
