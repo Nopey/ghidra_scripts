@@ -52,7 +52,7 @@ def truncateDT(data_type, typesize):
     while data_type.getLength() > typesize:
         data_type.deleteAtOffset(typesize)
     # Step 2. Fill with undefined1
-    data_type.growStructure(data_type.getSize())
+    data_type.growStructure(data_type.getLength())
 
 # \(\w+ \*\)operator.new\(((0x[0-9a-f]+)|(\d+))\)
 regex = '\\((\\w+) \\*\\)operator.new\\(((0x[0-9a-f]+)|(\\d+))\\)'
